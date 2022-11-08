@@ -1,32 +1,71 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart';
-import 'package:shelf_router/shelf_router.dart';
+import 'package:todo_server_api/api/api.dart';
+import 'package:todo_server_api/core/endpoint.dart';
+import 'package:todo_server_api/core/exception/api_exception.dart';
+import 'package:todo_server_api/core/exception/db_exception.dart';
+import 'package:todo_server_api/core/exception/validation_exception.dart';
 
-// Configure routes.
-final _router = Router()
-  ..get('/', _rootHandler)
-  ..get('/echo/<message>', _echoHandler);
+import 'systemInit.dart';
 
-Response _rootHandler(Request req) {
-  return Response.ok('Hello, World!\n');
-}
+part 'endpoints.dart';
 
-Response _echoHandler(Request request) {
-  final message = request.params['message'];
-  return Response.ok('$message\n');
+FutureOr<Response> _rootHandler(Request req) async {
+  try {
+    if (req.method != "POST") {
+      return Response(400, body: "Invalid method");
+    }
+
+    final data = await req.readAsString();
+    if (data.isEmpty) {
+      return Response(400, body: "Invalid request");
+    }
+    final jsonData = jsonDecode(data);
+    if (jsonData is! Map) {
+      return Response(400, body: "Invalid request");
+    }
+
+    final method = jsonData["method"];
+    if (method == null) {
+      return Response(400, body: "Method field must exists");
+    }
+
+    final endpoint = endpoints[method];
+    if (endpoint == null) {
+      return Response(400, body: "Method not found");
+    }
+
+    endpoint.parameters?.validate(jsonData["data"]);
+    final endpointData =
+        endpoint.parameters?.entityConstructor(jsonData["data"]) ??
+            jsonData["data"];
+    endpoint.validate(endpointData);
+    final res = await endpoint.method(endpointData);
+    final resJsonString = jsonEncode(res);
+    final resJson = jsonDecode(resJsonString);
+    endpoint.returns?.validate(resJson);
+    return Response.ok(resJsonString);
+  } on DbException catch (e) {
+    print(e.inner);
+    return Response(400, body: e.message);
+  } on ApiException catch (e) {
+    return Response(400, body: e.message);
+  } on ValidationException catch (e) {
+    return Response(400, body: e.message);
+  } catch (e) {
+    print(e);
+    return Response.internalServerError();
+  }
 }
 
 void main(List<String> args) async {
-  // Use any available host or container IP (usually `0.0.0.0`).
+  systemInit();
   final ip = InternetAddress.anyIPv4;
-
-  // Configure a pipeline that logs requests.
-  final handler = Pipeline().addMiddleware(logRequests()).addHandler(_router);
-
-  // For running in containers, we respect the PORT environment variable.
   final port = int.parse(Platform.environment['PORT'] ?? '8080');
-  final server = await serve(handler, ip, port);
+  final server = await serve(_rootHandler, ip, port);
   print('Server listening on port ${server.port}');
 }

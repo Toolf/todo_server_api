@@ -1,0 +1,1 @@
+CREATE TABLE MySystem (version int NOT NULL);
