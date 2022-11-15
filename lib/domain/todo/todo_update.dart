@@ -2,7 +2,7 @@ class TodoUpdate {
   final int todoId;
   final String? title;
   final String? description;
-  final bool completed;
+  final bool? completed;
 
   const TodoUpdate({
     required this.todoId,

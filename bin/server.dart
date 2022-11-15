@@ -15,28 +15,60 @@ import 'systemInit.dart';
 part 'endpoints.dart';
 
 FutureOr<Response> _rootHandler(Request req) async {
+  final defaultHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'X-Requested-With,content-type',
+  };
+  print("request");
   try {
+    if (req.method == "OPTIONS") {
+      return Response.ok(
+        "",
+        headers: defaultHeaders,
+      );
+    }
     if (req.method != "POST") {
-      return Response(400, body: "Invalid method");
+      return Response(
+        400,
+        body: "Invalid method",
+        headers: defaultHeaders,
+      );
     }
 
     final data = await req.readAsString();
     if (data.isEmpty) {
-      return Response(400, body: "Invalid request");
+      return Response(
+        400,
+        body: "Invalid request",
+        headers: defaultHeaders,
+      );
     }
     final jsonData = jsonDecode(data);
     if (jsonData is! Map) {
-      return Response(400, body: "Invalid request");
+      return Response(
+        400,
+        body: "Invalid request",
+        headers: defaultHeaders,
+      );
     }
 
     final method = jsonData["method"];
     if (method == null) {
-      return Response(400, body: "Method field must exists");
+      return Response(
+        400,
+        body: "Method field must exists",
+        headers: defaultHeaders,
+      );
     }
 
     final endpoint = endpoints[method];
     if (endpoint == null) {
-      return Response(400, body: "Method not found");
+      return Response(
+        400,
+        body: "Method not found",
+        headers: defaultHeaders,
+      );
     }
 
     endpoint.parameters?.validate(jsonData["data"]);
@@ -48,17 +80,35 @@ FutureOr<Response> _rootHandler(Request req) async {
     final resJsonString = jsonEncode(res);
     final resJson = jsonDecode(resJsonString);
     endpoint.returns?.validate(resJson);
-    return Response.ok(resJsonString);
+    print(resJsonString);
+    return Response.ok(
+      resJsonString,
+      headers: defaultHeaders,
+    );
   } on DbException catch (e) {
     print(e.inner);
-    return Response(400, body: e.message);
+    return Response(
+      400,
+      body: e.message,
+      headers: defaultHeaders,
+    );
   } on ApiException catch (e) {
-    return Response(400, body: e.message);
+    return Response(
+      400,
+      body: e.message,
+      headers: defaultHeaders,
+    );
   } on ValidationException catch (e) {
-    return Response(400, body: e.message);
+    return Response(
+      400,
+      body: e.message,
+      headers: defaultHeaders,
+    );
   } catch (e) {
     print(e);
-    return Response.internalServerError();
+    return Response.internalServerError(
+      headers: defaultHeaders,
+    );
   }
 }
 

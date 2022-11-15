@@ -9,6 +9,14 @@ class PaginationRequest {
     required this.filter,
   });
 
+  Map<String, dynamic> toJson() {
+    return {
+      'filter': filter,
+      'page': page,
+      'perPage': perPage,
+    };
+  }
+
   factory PaginationRequest.fromJson(Map<String, dynamic> json) {
     return PaginationRequest(
       filter: json['filter'] ?? '',
